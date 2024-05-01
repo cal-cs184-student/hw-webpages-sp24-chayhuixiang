@@ -1,0 +1,464 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <head>
+    <style>
+      body {
+        background-color: white;
+        padding: 100px;
+        width: 1000px;
+        margin: auto;
+        text-align: left;
+        font-weight: 300;
+        font-family: "Open Sans", sans-serif;
+        color: #121212;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        font-family: "Source Sans Pro", sans-serif;
+      }
+      kbd {
+        color: #121212;
+      }
+    </style>
+    <title>CS 184 Path Tracer</title>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <link
+      href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro"
+      rel="stylesheet"
+    />
+
+    <script>
+      MathJax = {
+        tex: {
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ],
+        },
+      };
+    </script>
+    <script
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"
+    ></script>
+  </head>
+
+  <body>
+    <h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2024</h1>
+    <h1 align="middle">
+      Final Project Checkpoint: Rendering of Grass with Realistic Motion
+      Simulation
+    </h1>
+    <h2 align="middle">
+      Chay Hui Xiang, Lim Sui Kiat, Marcus Yeo, Ong Jing Xuan
+    </h2>
+
+    <!-- Add Website URL -->
+    <h2 align="middle">
+      Website URL:
+      <a
+        href="https://cal-cs184-student.github.io/hw-webpages-sp24-chayhuixiang/Final%20Project/index.html"
+        >https://cal-cs184-student.github.io/hw-webpages-sp24-chayhuixiang/Final%20Project/index.html</a
+      >
+    </h2>
+    <h2 align="middle">
+      Video URL:
+      <a href="FILL THIS IN">FILL THIS IN</a>
+    </h2>
+    <br />
+
+    <div>
+      <h2 align="middle">Project Abstract</h2>
+      <p>
+        This project focuses on the simulation of natural terrain in computer
+        graphics. We aim to investigate the interaction of individual grass
+        blades under the influence of external forces such as wind, while also
+        attempting to optimize said methods to render grass more efficiently.
+        From this, we seek to deepen our understanding of physics simulation
+        within computer graphics. This project not only enhances our knowledge
+        of terrain simulation but also contributes to broader applications in
+        game development and realistic environmental modeling.
+      </p>
+      <br />
+
+      <h2 align="middle">Technical Approach</h2>
+      <h3>Implementation of Grass</h3>
+      <p>
+        We utilized 3 intersecting quads for the base unit of grass that we want
+        to replicate and use for our infinite grass. Using an initial texture,
+        we then propagated this image through GPU instancing to fill the terrain
+        with grass. We generate and compute grass positions using a compute
+        shader so that the grass positions are directly generated within the GPU
+        buffer. The result is as per seen in Figure 1 and 2 below.
+      </p>
+      <h3>Addition of Noise</h3>
+      <p>
+        Now that we are able to generate grass on the screen, our next step is
+        to make the grass look more natural. To do this, we want to add noise to
+        the xyz-axis in order to make the appearance of grass more random and
+        therefore, more natural. We achieve this using
+        <code>Simplex.compute</code> which provides 2D/3D gradient noise
+        functions. Through this, we are able to generate more realistic looking
+        grass as seen in Figure 3 and 4. As seen in Figure 4, for a better
+        aesthetic look, taller grass clusters are also given a more yellow
+        shade.
+      </p>
+      <div align="center">
+        <table style="width: 100%">
+          <tr align="center">
+            <td>
+              <img src="media/original.jpg" align="middle" width="500px" />
+              <figcaption>Figure 1: Initial Grass implementation</figcaption>
+            </td>
+            <td>
+              <img src="media/nonoise.png" align="middle" width="500px" />
+              <figcaption>
+                Figure 2: Populated Implementation of Grass
+              </figcaption>
+            </td>
+          </tr>
+          <tr align="center">
+            <td>
+              <img src="media/xnoise.png" align="middle" width="500px" />
+              <figcaption>Figure 3: Noise implemented in xz-axis</figcaption>
+            </td>
+            <td>
+              <img src="media/ynoise.png" align="middle" width="500px" />
+              <figcaption>Figure 4: Noise implemented in y-axis</figcaption>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <br />
+
+      <h2 align="middle">Simulating External Forces</h2>
+      <p>
+        Now that we have statically generated grass, we will add external forces
+        to create a more natural feel towards the grass. In this instance, we
+        chose to implement wind to simulate these external forces.
+      </p>
+      <p>
+        Here, the actual wind effect is applied by modifying the
+        <code>localPosition</code> of each blade. This position alteration
+        depends on the wind strength, the time factor (<code>_Time.y</code>),
+        and the <code>localWindVariance</code>.
+      </p>
+      <p>
+        We then use a cosine wave to simulate the swaying motion of the grass.
+        <code>cosTime</code> calculates a cosine value based on the time
+        component, which helps simulate the back-and-forth swaying motion of the
+        grass due to wind. The calculation of <code>cosTime</code> considers
+        both the wind strength and the blade's individual response to wind. We
+        then derive the variable <code>trigValue</code> from
+        <code>cosTime</code> and this is used to determine the extent of the
+        sway. It involves squaring <code>cosTime</code> to ensure that the sway
+        has a smoother transition and less direct linear movement, providing a
+        more realistic appearance of bending.
+      </p>
+      <p>
+        The final world position (<code>worldPosition</code>) of each grass
+        blade is calculated by adding the modified <code>localPosition</code> to
+        the original grass position (<code>grassPosition.xyz</code>). The
+        adjustments in the x and z coordinates simulate the sway, while the
+        y-coordinate adjustment ensures that the base of the blade remains more
+        or less fixed and the tip moves the most.
+      </p>
+      <br />
+
+      <h2 align="middle">
+        Unique Optimisation #1: Field of View and Level of Detail Rendering
+      </h2>
+      <p>
+        To optimize on how we’re rendering grass, we decided to implement
+        visibility culling, whereby assets that are not in the camera’s view are
+        excluded from being rendered. To achieve this, we edited the shader code
+        of the individual grass quads, such that if the quad’s position is
+        outside the FOV of the camera or is too far away (LOD), it will not be
+        rendered.
+      </p>
+      <h3>Field of View (FOV)</h3>
+      <p>
+        To determine if a certain quad is in the camera’s FOV, we use Unity’s
+        built-in shader variable <code>unity_CameraWorldClipPlanes</code> to
+        access the main camera’s clipping planes. Then, the dot product of
+        vertex p (position of the quad) and each clipping plane is calculated.
+        Theoretically, if this dot product is greater than zero, it means that
+        the vertex is “above” the plane, and should not be rendered. However, to
+        give more flexibility and ensure quads are not prematurely culled, we
+        use an <code>adjustedBias</code> variable instead of zero.
+      </p>
+      <h3>Level of Detail (LOD)</h3>
+      <p>
+        Another way to ensure that insignificant objects are not being rendered
+        is to use Level of Detail culling. As long as the distance between the
+        camera and the vertex p is more than a specified variable
+        <code>_LODCutoff</code>, the quad will not be rendered. This ensures
+        that objects that are too far away to be seen properly will not be
+        rendered.
+      </p>
+      <div align="center">
+        <table style="width: 100%">
+          <tr align="center">
+            <td>
+              <img src="media/lod_culling.png" align="middle" width="500px" />
+              <figcaption>
+                Figure 5: Grass rendition with LOD culling
+              </figcaption>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <h3>Bounds Adjustment</h3>
+      <p>
+        After the initial implementation, despite the addition of the
+        adjustedBias variable, the grass quads are still being culled
+        prematurely at the left and right planes, as well as at the near plane
+        of the camera. To tackle this, we added a margin variable, and increased
+        the <code>adjustedBias</code> to include this margin. This ensures that
+        a little extra grass is rendered beyond the culling planes of the
+        camera, such that the camera looks like it is situated within the grass,
+        and prevents premature culling.
+      </p>
+      <div align="center">
+        <table style="width: 100%">
+          <tr align="center">
+            <td>
+              <img src="media/nobounds.png" align="middle" width="500px" />
+              <figcaption>Figure 6: Grass without bounds adjustment</figcaption>
+            </td>
+            <td>
+              <img src="media/bounds.png" align="middle" width="500px" />
+              <figcaption>Figure 7: Grass with bounds adjustment</figcaption>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <br />
+      <h2 align="middle">Unique Optimisation #2: Chunk rendering</h2>
+      <p>
+        Currently, multiple grass meshes form a chunk, and multiple chunks
+        together form the entire grass patch. To further optimize our program’s
+        performance, chunks that are too far away from the camera are completely
+        excluded from the visual buffer.
+      </p>
+      <div align="center">
+        <table style="width: 100%">
+          <tr align="center">
+            <td>
+              <img
+                src="media/chunk_rendering.jpg"
+                align="middle"
+                width="500px"
+              />
+              <figcaption>
+                Figure 8: Mechanism of chunk rendering optimisation
+              </figcaption>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <p>
+        To determine the grass chunks to exclude from the visual buffer, the
+        distance between the camera position and the center of each grass chunk
+        is computed. If the distance falls below a custom set
+        <code>CustomRenderDistance</code>, the grass chunk is completely
+        excluded from the visual buffer.
+      </p>
+      <p>
+        Note: LOD culling and chunk rendering are separate, different
+        optimisation techniques. In LOD culling, individual grass blades which
+        fall beyond the culling distance are still written to the visual buffer,
+        but scaled down to an invisible mesh. In chunk rendering, the entire
+        grass chunk is completely excluded from the visual buffer, further
+        optimizing performance.
+      </p>
+      <br />
+      <h2 align="middle">Problems & lessons learnt</h2>
+      <h3>Technical Challenge #1: Unfamiliarity with the Unity ecosystem</h3>
+      <p>
+        In the beginning, only one of us ever had experience working with Unity
+        prior. Hence, we had to allocate additional time for all 4 of us to
+        properly pick up the necessary skills to execute the project.
+        <br />
+        <br />
+        <em>Lesson learnt #1</em>: Pick a toolkit that everybody is comfortable
+        with.
+      </p>
+      <h3>Technical Challenge #2: Shaders in Unity</h3>
+      <p>
+        Without any prior experience in Unity, knowing which Unity resources
+        within the Unity editor to tap on was a challenge. This was especially
+        apparent in the implementation of culling, whereby countless hours were
+        spent on the implementation of culling within the compute shader, only
+        to realise that the material shaders were what we were looking for.
+        These issues could have easily been prevented if we had done proper
+        research before even writing a single line of code.
+        <br />
+        <br />
+        <em>Lesson learnt #2</em>: Always do your proper research, and ensure
+        that you're ready before execution.
+      </p>
+      <h3>Non-technical challenge #1: Project workflow consensus</h3>
+      <p>
+        All 4 of us had no prior experience with working in a game developmental
+        environment, and hence we were unsure of how the game development
+        pipeline looked like. It was not only challenging to split the
+        developmental work into 4 equal slices, but also to craft out an
+        efficient pipeline for us to concurrently work on the project on our own
+        separate time. Fortunately, our project workflow was ironed out before
+        execution, which definitely saved us on a ton of time on potential work
+        overlaps and conflicts.
+        <br />
+        <br />
+        <em>Lesson learnt #3</em>: Come to a consensus on the project workflow,
+        and iron out any potential lapses in the developmental process before
+        execution.
+      </p>
+      <h3>Non-technical challenge #2: Asynchronous collaboration</h3>
+      <p>
+        Throughout the course of working on the project, it was difficult to
+        organise synchronous meetings due to conflicting schedules amongst the
+        team members. This made it difficult to iron out any ongoing challenges,
+        and pave the way ahead. Hence, we had to rely on mostly asynchronous
+        collaboration, relying on telegram for communication, and tools like
+        Google Drive for better organisation and task-keeping.
+        <br />
+        <br />
+        <em>Lesson learnt #4</em>: Iron out the schedules amongst the team
+        during the first meeting, and come up with a asynchronous plan.
+      </p>
+      <h3></h3>
+      <br />
+      <h2 align="middle">Results</h2>
+      <h3>FOV and LOD optimisation</h3>
+      <p>
+        Comparing renders for a field size of 1000, the FPS achieved with
+        culling optimization increased by 42%, from 13.3 FPS to 18.9 FPS.
+      </p>
+      <div align="center">
+        <table style="width: 100%">
+          <tr align="center">
+            <td>
+              <img src="media/noculling.png" align="middle" width="500px" />
+              <figcaption>
+                Figure 9: Grass with no culling optimisation
+              </figcaption>
+            </td>
+            <td>
+              <img src="media/culling.png" align="middle" width="500px" />
+              <figcaption>Figure 10: Grass with FOV and LOD culling</figcaption>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <h3>Chunk rendering optimisation</h3>
+      <p>
+        Comparing renders for a field size of 1000, the FPS achieved with chunk
+        rendering optimization increased by almost 7 fold, from 10.3 FPS to 70.5
+        FPS.
+      </p>
+      <div align="center">
+        <table style="width: 100%">
+          <tr align="center">
+            <td>
+              <img src="media/nochunkopt.jpg" align="middle" width="800px" />
+              <figcaption>
+                Figure 11: Performance without chunk rendering optimisation
+              </figcaption>
+            </td>
+          </tr>
+          <tr align="center">
+            <td>
+              <img src="media/chunkopt.jpg" align="middle" width="800px" />
+              <figcaption>
+                Figure 12: Performance with chunk rendering optimisation
+              </figcaption>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <h3>Final project scene</h3>
+      <div align="center">
+        <table style="width: 100%">
+          <tr align="center">
+            <td>
+              <video width="800" controls>
+                <source src="media/Grass1.mp4" type="video/mp4" />
+              </video>
+              <figcaption>
+                Rendered grass from the perspective of a human on the ground
+              </figcaption>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <br />
+
+      <div align="center">
+        <table style="width: 100%">
+          <tr align="center">
+            <td>
+              <video width="800" controls>
+                <source src="media/Grass2.mp4" type="video/mp4" />
+              </video>
+              <figcaption>
+                Rendered grass from the perspective of a floating camera
+              </figcaption>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <br />
+      <h2 align="middle">References</h2>
+      <ul>
+        <li>
+          NVIDIA article on rendering countless waves of grass:
+          <a
+            href="https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-7-rendering-countless-blades-waving-grass"
+            >https://developer.nvidia.com/gpugems/gpugems/part-i-natural-effects/chapter-7-rendering-countless-blades-waving-grass</a
+          >
+        </li>
+      </ul>
+      <br />
+      <h2 align="middle">Contributions</h2>
+      <h3>Chay Hui Xiang</h3>
+      <ul>
+        <li>
+          Populated initial grass clusters and created initial working prototype
+        </li>
+        <li>Added wind simulations to grass</li>
+        <li>Added y-noise aesthetics to differentiate tall and short grass</li>
+      </ul>
+      <h3>Lim Sui Kiat</h3>
+      <ul>
+        <li>Added xyz noise to grass</li>
+        <li>
+          Compiled website / report deliverables for project checkpoint and
+          final project submission
+        </li>
+      </ul>
+      <h3>Marcus Yeo</h3>
+      <ul>
+        <li>Implemented chunk rendering optimisation</li>
+        <li>Added moving camera system</li>
+        <li>
+          Curated project video for project checkpoint and final project
+          submission
+        </li>
+      </ul>
+      <h3>Ong Jing Xuan</h3>
+      <ul>
+        <li>
+          Scaffolded project skeleton, instantiating grass textures and creating
+          initial boilerplate for grass rendering
+        </li>
+        <li>Implemented LOD culling</li>
+        <li>Implemented FOV culling</li>
+        <li>Implemented chunk rendering</li>
+      </ul>
+    </div>
+  </body>
+</html>
